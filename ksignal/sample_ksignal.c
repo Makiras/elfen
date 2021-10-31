@@ -86,8 +86,8 @@ main(int argc, char **argv)
   int i;
 
   unsigned long signal_phy_addr[16];
-  fetch_signal_phy_address("/sys/module/ksignal/parameters/task_signal", 16, signal_phy_addr);
-  for (i=0; i<16; i++) {
+  fetch_signal_phy_address("/sys/module/ksignal/parameters/task_signal", 4, signal_phy_addr);
+  for (i=0; i<4; i++) {
     printf("CPU %d task signal at phy addr 0x%lx\n", i, signal_phy_addr[i]);
   }
   //let's monitor CPU 0
