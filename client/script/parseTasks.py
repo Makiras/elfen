@@ -273,10 +273,11 @@ def parse_lucene_iter(parsed_log):
 #    ipkc = np.array(diff_cols[instruction_index]) * 1000 / np.array(diff_cols[cycle_index]);
 #    for i in range(0, len(ipkc)):
 #        print "%d : %d, %d" % (i, ipkc[i], ptimeMS[i])
-    ipkc = (np.array(cols[cycle_index]) * 1000)/np.array(cols[instruction_index]);
+    ipkc = (np.array(cols[cycle_index]) * 1000.0)/np.array(cols[instruction_index]);
+#    for i in ipkc:
+#        print i,
     ipkc_hist = norfreq(ipkc);
     ipkc_perc = latency(ipkc);
-
     #idle report
 
 
@@ -388,7 +389,7 @@ if __name__ == "__main__":
 #how many requests we have
     if (True):
         f = open('./qps-latency.csv', 'w');
-        f.write("#timestamp:%s qps,realqps,ptime_50latency,ptime_95latency,ltime_50,ltime_95,CPU utiliztion,IPC\n" % datetime.datetime.now());
+        f.write("#timestamp:%s qps,realqps,p50,p95,p99, l50,l95,l99, c50,c95,c99 utiliztion,IPC\n" % datetime.datetime.now());
         bl = ""
         for qps in sorted(logs.keys()):
             realqps = logs[qps]["measured_qps"];
@@ -404,7 +405,7 @@ if __name__ == "__main__":
             ctime_95 = logs[qps]["ctime_perc"]["95"];
             ctime_99 = logs[qps]["ctime_perc"]["99"];
             bl += " [%d]=%d " %(qps,100-ltime_99);
-            f.write("%d,%d,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%d\n" % (qps,realqps,ptime_50,ptime_95,ptime_99,ltime_50,ltime_95,ltime_99,ctime_50,ctime_95,ctime_99,cpu_util,ipc));
+            f.write("%d,%d,\t(%.3f,%.3f,%.3f),\t(%.3f,%.3f,%.3f),\t(%.3f,%.3f,%.3f),\t%.3f, %.3f\n" % (qps,realqps,ptime_50,ptime_95,ptime_99,ltime_50,ltime_95,ltime_99,ctime_50,ctime_95,ctime_99,cpu_util,ipc));
         f.write("#budgets=( %s )\n" %bl);
         for qps in sorted(logs.keys()):
             f.write("#ltime_per_index=" + str(logs[qps]["ltime_perc"]["perc_index"]) + " ptime_index " + str(logs[qps]["ptime_perc"]["perc_index"]) + " \n");
