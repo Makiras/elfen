@@ -36,17 +36,64 @@
 #define debug_print(...) fprintf(stderr, __VA_ARGS__)
 #define N_CPU 4
 
+// nanonap
 int nfd = -1;
 volatile unsigned long *task_core0 = NULL;
+// lucene state
+unsigned long *lucene_signal_base;
+volatile unsigned int *lucene_queue_signal;
+volatile unsigned long *lucene_signal_buf;
+unsigned long cr_start_timestamp;
+// i5-5200U, 2.2GHz, constant_tsc
+const unsigned long budget = 4400000; // 2ms
+
+enum Estatus
+{
+    NORMAL,
+    NEW_PERIOD,
+    CO_RUNNING,
+    OTHERS,
+};
+
+enum Estatus lane_status = NORMAL;
+
+static __attribute__((no_instrument_function)) 
+unsigned long __inline__ rdtsc(void)
+{
+  unsigned int tickl, tickh;
+  __asm__ __volatile__("rdtscp":"=a"(tickl),"=d"(tickh)::"%ecx");
+  return ((uint64_t)tickh << 32)|tickl;
+}
 
 void __attribute__((no_instrument_function))
 __cyg_profile_func_enter(void *this_func, void *call_site)
 {
     // inject to every function entry
     unsigned long val = *task_core0; // take pid on Lucene
-    printf("CPU 0's running task is pid:%d, tid:%d\n", (int)(val & (0xffffffff)), (int)(val >> 32));
-    if((int)(val & (0xffffffff)) != 0) // partner not idle, sleep
-        ioctl(nfd, 0, NULL); // get into nanonap
+    unsigned int queue_len = *lucene_queue_signal;
+    // printf("CPU 0's running task is pid:%d, tid:%d\n", (int)(val & (0xffffffff)), (int)(val >> 32));
+
+    unsigned int pid = (unsigned int)(val & (0xffffffff));
+    if (pid == 0 && queue_len == 0) // partner is idle, queue len = 0
+        lane_status = NEW_PERIOD;
+    else if (pid != 0) // partner is running
+    {
+        switch (lane_status)
+        {    
+        case NORMAL:
+            ioctl(nfd, 0, NULL); // get into nanonap
+            break;
+        case NEW_PERIOD:
+            lane_status = CO_RUNNING;
+            cr_start_timestamp = rdtsc();
+            break;
+        case CO_RUNNING:
+            if (rdtsc() - cr_start_timestamp > budget) // 1ms
+                lane_status = NORMAL;
+            break;
+        }
+        
+    }
 }
 
 int __attribute__((no_instrument_function))
@@ -72,6 +119,29 @@ fetch_signal_phy_address(char *path, int nr_cpu, unsigned long *signal_addr)
     }
     close(fd);
     return 0;
+}
+
+void __attribute__((no_instrument_function))
+init_lucene_signal()
+{
+    int fd = open("../lucene/util/lucene_signal", O_RDWR);
+    if (fd == -1)
+    {
+        err(1, "Can't open ../lucene/util/lucene_signal\n");
+        exit(1);
+    }
+    lucene_signal_base = (unsigned long *)mmap(0, 0x1024, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    if (lucene_signal_base == MAP_FAILED)
+    {
+        err(1, "Can't mmap ../lucene/util/lucene_signal\n");
+        exit(1);
+    }
+    lucene_signal_buf = lucene_signal_base + 1;
+    lucene_queue_signal = (unsigned int *)lucene_signal_base;
+    for (int i = 0; i < 17; i++)
+    {
+        lucene_signal_base[i] = 0;
+    }
 }
 
 int __attribute__((no_instrument_function))
@@ -105,27 +175,28 @@ int a[5][5] = {
     {6, 7, 8, 9, 10},
     {11, 12, 13, 14, 15},
     {16, 17, 18, 19, 20},
-    {21, 22, 23, 24, 25}
-};
+    {21, 22, 23, 24, 25}};
 int b[5][5] = {
     {1, 2, 3, 4, 5},
     {6, 7, 8, 9, 10},
     {11, 12, 13, 14, 15},
     {16, 17, 18, 19, 20},
-    {21, 22, 23, 24, 25}
-};
+    {21, 22, 23, 24, 25}};
 int c[5][5] = {
     {0, 0, 0, 0, 0},
     {0, 0, 0, 0, 0},
     {0, 0, 0, 0, 0},
     {0, 0, 0, 0, 0},
-    {0, 0, 0, 0, 0}
-};
+    {0, 0, 0, 0, 0}};
 
-void matrix() {
-    for (int i = 0; i < 5; i++) {
-        for (int j = 0; j < 5; j++) {
-            for (int k = 0; k < 5; k++) {
+void matrix()
+{
+    for (int i = 0; i < 5; i++)
+    {
+        for (int j = 0; j < 5; j++)
+        {
+            for (int k = 0; k < 5; k++)
+            {
                 c[i][j] += a[i][k] * b[k][j];
             }
         }
@@ -133,7 +204,7 @@ void matrix() {
     return;
 }
 
-int __attribute__((no_instrument_function)) 
+int  __attribute__((no_instrument_function)) 
 main(int argc, char **argv)
 {
     unsigned long signal_phy_addr[N_CPU];
@@ -146,12 +217,16 @@ main(int argc, char **argv)
     unsigned long val = *task_core0;
     printf("CPU 0's running task is pid:%d, tid:%d\n", (int)(val & (0xffffffff)), (int)(val >> 32));
     // let's get nanonap
-    nfd = open("/dev/nanonap", O_RDONLY| O_CLOEXEC);
-    if (nfd < 0){
+    nfd = open("/dev/nanonap", O_RDONLY | O_CLOEXEC);
+    if (nfd < 0)
+    {
         fprintf(stderr, "Can't open /dev/nanonap\n");
         exit(0);
     }
-    while(1){
+    // let's get lucene signal
+    init_lucene_signal();
+    while (1)
+    {
         matrix();
     }
 }
