@@ -273,7 +273,7 @@ def parse_lucene_iter(parsed_log):
 #    ipkc = np.array(diff_cols[instruction_index]) * 1000 / np.array(diff_cols[cycle_index]);
 #    for i in range(0, len(ipkc)):
 #        print "%d : %d, %d" % (i, ipkc[i], ptimeMS[i])
-    ipkc = (np.array(cols[cycle_index]) * 1000.0)/np.array(cols[instruction_index]);
+    ipkc = (np.array(diff_cols[instruction_index]) * 1.0) / np.array(diff_cols[cycle_index]);
 #    for i in ipkc:
 #        print i,
     ipkc_hist = norfreq(ipkc);
