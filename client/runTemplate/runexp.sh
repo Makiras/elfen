@@ -12,7 +12,7 @@ for bench in latency; do
 #    sleep 3
     BASETAG="${bench}cmp"
     for ((i=1; i<=20; i=i+1)); do
-	for ((q=900;q<=900;q=q+50)); do
+	    for ((q=900;q<=900;q=q+50)); do
             echo "Invoking at QPS $q ITERATIONS $ITERs";
             TAG="${BASETAG}Invok${i}"
             ssh xeond "taskset 0x80 taskset 0x80 cat /proc/stat" > ./stat_${TAG}_${q}_${ITERs}_begin

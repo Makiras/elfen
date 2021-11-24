@@ -21,6 +21,7 @@
 #include <stdlib.h>
 #include <pthread.h>
 #include <getopt.h>
+#include <signal.h>
 #include <unistd.h>
 #include <sys/syscall.h>
 #include <sys/types.h>
@@ -38,6 +39,7 @@
 // nanonap
 int nfd = -1;
 volatile unsigned long *task_core0 = NULL;
+long task_cnt = 0;
 
 int __attribute__((no_instrument_function))
 fetch_signal_phy_address(char *path, int nr_cpu, unsigned long *signal_addr)
@@ -96,8 +98,8 @@ volatile unsigned int *lucene_queue_signal;
 volatile unsigned long *lucene_signal_buf;
 unsigned long cr_start_timestamp;
 unsigned long last_request;
-// i5-5200U, 2.2GHz, constant_tsc
-const unsigned long budget = 4400000; // 2ms
+// budget, ms * 1M * cpu_freq (constant_tsc need)
+const unsigned long budget = 8 * 1000 * 1000 * 2.9; // 8ms, 2.9Ghz
 
 enum Estatus
 {
@@ -144,7 +146,7 @@ init_lucene_signal()
 
 int perf_fd = -1;
 int lc_read_id = 0;
-const float ref_ipc = 0.02;
+const float ref_ipc = 1.8;
 
 struct read_format
 {
@@ -166,7 +168,8 @@ init_perf_var()
 {
     int LC_pid = 0, LC_cpu = 0;
     puts("Input LC pid, LC cpu:");
-    scanf("%d %d", &LC_pid, &LC_cpu);
+    // scanf("%d %d", &LC_pid, &LC_cpu);
+    LC_pid = 9619;  // lucene
 
     memset(&attr, 0, sizeof(struct perf_event_attr));
     attr.size = sizeof(struct perf_event_attr);
@@ -216,6 +219,7 @@ __cyg_profile_func_enter(void *this_func, void *call_site)
     // inject to every function entry
     unsigned long val = *task_core0; // take pid on Lucene
     unsigned int queue_len = *lucene_queue_signal;
+    double calc_ipc = 0;
     // printf("CPU 0's running task is pid:%d, tid:%d\n", (int)(val & (0xffffffff)), (int)(val >> 32));
 
     unsigned int pid = (unsigned int)(val & (0xffffffff));
@@ -238,10 +242,13 @@ __cyg_profile_func_enter(void *this_func, void *call_site)
             {
                 last_request = *lucene_signal_buf;
                 cr_start_timestamp = rdtsc(); // refresh timestamp
+                return;
             }
             // if timestamp is refreshed, it won't reach budget
             // calc real budget time with latency critical app ipc
-            else if (rdtsc() - cr_start_timestamp > budget * (ref_ipc / ref_ipc - cacl_ipc()))
+            // what if (ref-cacl_ipc) < 0 ? it will be positive feedback
+            calc_ipc = ref_ipc - cacl_ipc();
+            if (rdtsc() - cr_start_timestamp > budget * (ref_ipc / calc_ipc) && calc_ipc > 0)
                 lane_status = NORMAL;
             break;
         }
@@ -269,6 +276,12 @@ int c[5][5] = {
     {0, 0, 0, 0, 0},
     {0, 0, 0, 0, 0}};
 
+void __attribute__((no_instrument_function)) show_taskcnt(int x)
+{
+    printf("calc matrix %ld times.\n", task_cnt);
+    exit(0);
+}
+
 void matrix()
 {
     for (int i = 0; i < 5; i++)
@@ -281,12 +294,14 @@ void matrix()
             }
         }
     }
+    task_cnt++;
     return;
 }
 
 int __attribute__((no_instrument_function))
 main(int argc, char **argv)
 {
+    signal(SIGINT, show_taskcnt);
     unsigned long signal_phy_addr[N_CPU];
     fetch_signal_phy_address("/sys/module/ksignal/parameters/task_signal", N_CPU, signal_phy_addr);
     for (int i = 0; i < N_CPU; i++)

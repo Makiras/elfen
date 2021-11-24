@@ -24,6 +24,7 @@
 #ifndef _GNU_SOURCE
 #define _GNU_SOURCE
 #endif
+#include <signal.h>
 #include <unistd.h>
 #include <sys/syscall.h>
 #include <sys/types.h>
@@ -39,14 +40,15 @@
 // nanonap
 int nfd = -1;
 volatile unsigned long *task_core0 = NULL;
+long task_cnt = 0;
 // lucene state
 unsigned long *lucene_signal_base;
 volatile unsigned int *lucene_queue_signal;
 volatile unsigned long *lucene_signal_buf;
 unsigned long cr_start_timestamp;
 unsigned long last_request;
-// i5-5200U, 2.2GHz, constant_tsc
-const unsigned long budget = 4400000; // 2ms
+
+const unsigned long budget = 8 * 1000 * 1000 * 2.9; // 8ms, 2.9Ghz
 
 enum Estatus
 {
@@ -197,6 +199,12 @@ int c[5][5] = {
     {0, 0, 0, 0, 0},
     {0, 0, 0, 0, 0}};
 
+void __attribute__((no_instrument_function)) show_taskcnt(int x)
+{
+    printf("calc matrix %ld times.\n", task_cnt);
+    exit(0);
+}
+
 void matrix()
 {
     for (int i = 0; i < 5; i++)
@@ -209,12 +217,14 @@ void matrix()
             }
         }
     }
+    task_cnt++;
     return;
 }
 
 int  __attribute__((no_instrument_function)) 
 main(int argc, char **argv)
 {
+    signal(SIGINT, show_taskcnt);
     unsigned long signal_phy_addr[N_CPU];
     fetch_signal_phy_address("/sys/module/ksignal/parameters/task_signal", N_CPU, signal_phy_addr);
     for (int i = 0; i < N_CPU; i++)
