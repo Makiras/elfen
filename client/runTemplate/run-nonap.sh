@@ -9,7 +9,15 @@ QPS=100
 Tasks="wiki.s.10M.nostopwords.tasks"
 
 # Perf nonap corunning
-for ((QPS=420;QPS>=10;QPS=QPS-15)); do
+for ((QPS=300;QPS>=10;QPS=QPS-15)); do
+
+    if [ $QPS -gt 180 ]
+    then
+        ITERs=20
+    else
+        ITERs=5
+    fi
+
     # lucene will running on CPU 0
     taskset -c 16 python2 -u ../script/sendTasks.py "../script/${Tasks}" 10.16.0.184 7777 ${QPS} 1000000 200000 test_${QPS}_${ITERs} ${ITERs} order > py_log_${QPS}_${ITERs}.txt &
     pyPid=$!

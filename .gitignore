@@ -31,3 +31,8 @@ nanonap/*
 nanonap/*mod*
 
 client/script/wikimedium*
+
+paper/picture/*
+**/__pycache__
+
+!*README.md

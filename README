@@ -5,3 +5,5 @@ nanonap: Linux kernel patch and the nanonap kernel module.
 microbench: Instrumentation code for C micro-benchmarks used in the paper.
 dacapobench: JikesRVM patch for running Dacapo benchmarks as the batch workload.
 misc: scripts for processing the results.
+
+client: running test scripts

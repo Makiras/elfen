@@ -146,7 +146,7 @@ init_lucene_signal()
 
 int perf_fd = -1;
 int lc_read_id = 0;
-const float ref_ipc = 1.8;
+const float ref_ipc = 2.0;
 
 struct read_format
 {
@@ -169,7 +169,7 @@ init_perf_var()
     int LC_pid = 0, LC_cpu = 0;
     puts("Input LC pid, LC cpu:");
     // scanf("%d %d", &LC_pid, &LC_cpu);
-    LC_pid = 9619;  // lucene
+    LC_pid = 5754;  // lucene
 
     memset(&attr, 0, sizeof(struct perf_event_attr));
     attr.size = sizeof(struct perf_event_attr);

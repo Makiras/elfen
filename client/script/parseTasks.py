@@ -312,6 +312,7 @@ def parse_lucene_iter(parsed_log):
 
     ptimeNS = np.array(cols[finish_stamp_index]) - np.array(cols[process_stamp_index])
     ptimeMS = ptimeNS / (1000 * 1000)
+    print("ptimeMS:")
     ptime_hist = norfreq(ptimeMS)
     ptime_time_hist = norfreq_to_timefreq(ptime_hist)
     ptime_perc = latency(ptimeNS)
